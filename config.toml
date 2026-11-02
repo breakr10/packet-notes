@@ -2,7 +2,7 @@ baseURL = "https://breakr10.github.io/packet-notes/"
 languageCode = "en-us"
 theme = "hugo-winston-theme"
 themesDir = "themes"
-title = "// EagleEye Security"
+title = "// Eagle Eye Security"
 
 [pagination]
 pagerSize = 3
@@ -49,7 +49,7 @@ pygmentsUseClasses = true
   discord_invite = "breakr"
   email = "breakr@tuta.com"
   repo_name = "hugo-winston-cyber"  # for GitHub stars badge
-  footer_text = ":: F4dS3c Blog"  # Add this line for custom footer text
+  footer_text = ":: breakr Blog"  # Add this line for custom footer text
   footer_year = "2024-2025"  # Static year for footer
 
 # markdown config settings https://gohugo.io/getting-started/configuration-markup/#goldmark
