@@ -18,7 +18,7 @@ pygmentsUseClasses = true
  
 [params]
   google_analytics_id = ""
-  twitter_handle = "@anon_faded"
+  twitter_handle = "@breakr"
   showAuthorOnHomepage = true
   showAuthorOnPosts = false
   showIntroContentOnHomepage = true # the description below the title on home page
@@ -45,8 +45,8 @@ pygmentsUseClasses = true
   fontFamilyMonospace = "Ubuntu Mono"
   showAboutPage = false  # Toggle to control About page visibility
   github_username = "breakr10"
-  kofi_username = "fadedx"
-  discord_invite = "kvAZvdkuuN"
+  kofi_username = "breakr"
+  discord_invite = "breakr"
   email = "breakr@tuta.com"
   repo_name = "hugo-winston-cyber"  # for GitHub stars badge
   footer_text = ":: F4dS3c Blog"  # Add this line for custom footer text
