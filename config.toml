@@ -1,8 +1,8 @@
-baseURL = "https://anonfaded.github.io/hugo-winston-cyber/"
+baseURL = "https://breakr10.github.io/packet-notes/"
 languageCode = "en-us"
 theme = "hugo-winston-theme"
 themesDir = "themes"
-title = "// F4dS3c Blog"
+title = "// EagleEye Security"
 
 [pagination]
 pagerSize = 3
@@ -44,10 +44,10 @@ pygmentsUseClasses = true
   fontFamilyParagraph = "Ubuntu"
   fontFamilyMonospace = "Ubuntu Mono"
   showAboutPage = false  # Toggle to control About page visibility
-  github_username = "anonfaded"
+  github_username = "breakr10"
   kofi_username = "fadedx"
   discord_invite = "kvAZvdkuuN"
-  email = "fadedhood@proton.me"
+  email = "breakr@tuta.com"
   repo_name = "hugo-winston-cyber"  # for GitHub stars badge
   footer_text = ":: F4dS3c Blog"  # Add this line for custom footer text
   footer_year = "2024-2025"  # Static year for footer
