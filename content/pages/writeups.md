@@ -14,7 +14,7 @@ description: "A categorized index of CTF and lab writeups, organized by platform
 - [Fluffy](/packet-notes/posts/fluffy/) — CVE-2025-24071, Shadow Credentials, AD CS ESC16
 
 **Medium**
-<!-- Add medium-difficulty Windows boxes here -->
+- [Administrator](/packet-notes/posts/administrator) - Active Directory, ACL Abuse, Kerberoasting, DCSync
 
 **Hard**
 <!-- Add hard-difficulty Windows boxes here -->
