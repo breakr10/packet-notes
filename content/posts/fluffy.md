@@ -213,7 +213,7 @@ Start Responder
 
 As Responder is listening place the created file into the SMB Share.
 
-![Placing exploit file into the SMB share](/images/fluffy/exploit-1.png)
+![Placing exploit file into the SMB share](/images/fluffy/Exploit.png)
 
 Next use `hashcat` to crack the hash.
 
