@@ -9,6 +9,9 @@ target_ip: "10.129.32.56"
 os: Windows
 difficulty: Easy
 status: Complete
+platforms: ["HackTheBox"]
+oses: ["Windows"]
+difficulties: ["Easy"]
 ---
 
 # 🚩 Box Name: Baby
