@@ -10,7 +10,7 @@ description: "A categorized index of CTF and lab writeups, organized by platform
 ### Windows
 
 **Easy**
-- [Baby](/posts/baby/) — Active Directory, LDAP enumeration, SeBackupPrivilege, DCSync
+- [baby](/posts/baby/) — Active Directory, LDAP enumeration, SeBackupPrivilege, DCSync
 - [Fluffy](/posts/fluffy/) — CVE-2025-24071, Shadow Credentials, AD CS ESC16
 
 **Medium**
