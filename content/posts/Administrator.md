@@ -178,7 +178,7 @@ The first interesting relationship was that **Olivia has GenericAll rights over 
 GenericAll is essentially the Active Directory equivalent of being handed someone's account keys. It grants full control over the target object, allowing actions such as resetting passwords, modifying attributes, and much more.
 
 
-![[O to M BH.png]]
+![[static/images/administrator/O to M BH.png]]
 
 
 #### Michael → Benjamin
@@ -187,12 +187,12 @@ Following the graph further, Michael has **ForceChangePassword** rights over Ben
 
 Meaning if I can take over Michael, I can immediately take over Benjamin as well.
 
-![[M to B BH.png]]
+![[static/images/administrator/M to B BH.png]]
 
 
 The attack path looked like this:
 
-![[O to S BH.png]]
+![[static/images/administrator/O to S BH.png]]
 
 
 At this point I didn't see an obvious route to Domain Admin, but gaining access to additional accounts often uncovers new opportunities. Time to start collecting identities.
@@ -325,7 +325,7 @@ I next installed `passwordsafe`
 
 After opening the database with Password Safe, I found another set of credentials:
 
-![[emily DB passwd.png]]
+![[static/images/administrator/emily DB passwd.png]]
 
 
 `emily:UXLCI5iETUsIBoFVTj8yQFKoHjXmb`
@@ -347,7 +347,7 @@ Anyone with DCSync privileges can impersonate a Domain Controller and request pa
 The only challenge is getting control of Ethan's account.
 
 
-![[E to E.png]]
+![[static/images/administrator/E to E.png]]
 
 
 #### Verifying the Permissions
