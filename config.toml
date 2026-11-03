@@ -86,3 +86,9 @@ pygmentsUseClasses = true
     identifier = "writeups"
     weight = 5
     url = "/pages/writeups/"
+  [taxonomies]
+    tag = "tags"
+    category = "categories"
+    platform = "platforms"
+    os = "oses"
+    difficulty = "difficulties"
