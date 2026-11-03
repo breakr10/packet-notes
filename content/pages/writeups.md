@@ -1,25 +1,31 @@
 ---
 title: "Writeups"
-description: "Browse CTF and lab writeups by platform, OS, or difficulty."
+description: "A categorized index of CTF and lab writeups, organized by platform, OS, and difficulty."
 ---
 
 # Writeups
 
-Browse by whichever angle you're interested in — each link below pulls in every post tagged that way, automatically.
+## HackTheBox
 
-## By Platform
-- [HackTheBox](/platforms/hackthebox/)
-<!-- Add new platforms here as you post them, e.g. - [TryHackMe](/platforms/tryhackme/) -->
+### Windows
 
-## By Operating System
-- [Windows](/oses/windows/)
-<!-- - [Linux](/oses/linux/) -->
+**Easy**
+- [Baby](/posts/baby/) — Active Directory, LDAP enumeration, SeBackupPrivilege, DCSync
+- [Fluffy](/posts/fluffy/) — CVE-2025-24071, Shadow Credentials, AD CS ESC16
 
-## By Difficulty
-- [Easy](/difficulties/easy/)
-<!-- - [Medium](/difficulties/medium/) -->
-<!-- - [Hard](/difficulties/hard/) -->
+**Medium**
+<!-- Add medium-difficulty Windows boxes here -->
 
-## Latest Writeups
-- [Baby](/posts/Baby/) — HackTheBox, Windows, Easy
-- [Fluffy](/posts/fluffy/) — HackTheBox, Windows, Easy
+**Hard**
+<!-- Add hard-difficulty Windows boxes here -->
+
+### Linux
+
+**Easy**
+<!-- Add easy-difficulty Linux boxes here -->
+
+**Medium**
+<!-- Add medium-difficulty Linux boxes here -->
+
+**Hard**
+<!-- Add hard-difficulty Linux boxes here -->
