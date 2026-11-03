@@ -178,7 +178,7 @@ The first interesting relationship was that **Olivia has GenericAll rights over 
 GenericAll is essentially the Active Directory equivalent of being handed someone's account keys. It grants full control over the target object, allowing actions such as resetting passwords, modifying attributes, and much more.
 
 
-![Michael to Benjamin]( /images/administrator/M%20to%20B%20BH.png )
+![Michael to Benjamin](administrator/M%20to%20B%20BH.png )
 
 
 #### Michael → Benjamin
