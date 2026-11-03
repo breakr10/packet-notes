@@ -21,5 +21,5 @@ Browse by whichever angle you're interested in — each link below pulls in ever
 <!-- - [Hard](/difficulties/hard/) -->
 
 ## Latest Writeups
-- [Baby](/posts/baby/) — HackTheBox, Windows, Easy
+- [Baby](/posts/Baby/) — HackTheBox, Windows, Easy
 - [Fluffy](/posts/fluffy/) — HackTheBox, Windows, Easy
