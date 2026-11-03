@@ -9,9 +9,6 @@ target_ip: "10.129.232.88"
 os: Windows
 difficulty: Easy
 status: Complete
-platforms: ["HackTheBox"]
-oses: ["Windows"]
-difficulties: ["Easy"]
 ---
 
 # 🚩 Box Name: Fluffy
