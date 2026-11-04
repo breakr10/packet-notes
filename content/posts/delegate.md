@@ -282,7 +282,7 @@ RustHound-CE Enumeration Completed at 13:11:13 on 05/25/26! Happy Graphing!
 
 Now I uploaded the `.json` files onto `BloodHound`. Let's see if there is anything interesting.
 
-![BloodHound data showing A.Briggs with GenericWrite over N.Thompson](/images/delegate/bhdata.png)
+![BloodHound data showing A.Briggs with GenericWrite over N.Thompson](/images/delegate/bh_data.png)
 
 `A.Briggs` has `GenericWrite` over the user `N.Thompson`. If we can gain access to this user we can Remote into the machine.
 
