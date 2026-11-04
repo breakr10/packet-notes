@@ -15,8 +15,8 @@ description: "A categorized index of CTF and lab writeups, organized by platform
 
 **Medium**
 - [Administrator](/packet-notes/posts/administrator) - Active Directory, ACL Abuse, Kerberoasting, DCSync
--  [Authority](/packet-notes/posts/authority) - Active Directory, Ansible Vault, ADCS ESC1, DCSync
-
+- [Authority](/packet-notes/posts/authority) - Active Directory, Ansible Vault, ADCS ESC1, DCSync
+- [Delegate](/packet-notes/posts/delegate) - Active Directory, Unconstrained Delegation, Kerberoasting, GenericWrite
 **Hard**
 <!-- Add hard-difficulty Windows boxes here -->
 
