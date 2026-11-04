@@ -5,7 +5,6 @@ draft: false
 tags: ["Active Directory", "Windows", "HackTheBox", "LDAP", "DCSync"]
 categories: ["Writeups"]
 description: "Walkthrough of the Baby Windows Active Directory box: LDAP enumeration, password reset via STATUS_PASSWORD_MUST_CHANGE, SeBackupPrivilege abuse, and a DCSync attack to full Domain Admin."
-target_ip: "10.129.32.56"
 os: Windows
 difficulty: Easy
 status: Complete
