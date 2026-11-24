@@ -18,7 +18,7 @@ difficulties: ["Medium"]
 ## 📋 Initial Info
 - **Hostname:** `target.htb`
 
-Authority is a medium-difficulty Windows machine that shows exactly how a chain of minor slipups can compromise an entire enterprise. I start by hunting through network shares, where human error like password reuse and poorly stored credentials gives me an initial foothold.
+Authority is a medium difficulty Windows machine that shows exactly how a chain of minor slipups can compromise an entire enterprise. I start by hunting through network shares, where human error like password reuse and poorly stored credentials gives me an initial foothold.
 
 From there, it is all about exploiting Active Directory. I combine a seemingly harmless default setting where any standard user can add up to 10 computers to the domain with a misconfigured AD CS certificate template. By chaining these two issues together, I take over the domain.
 
@@ -216,7 +216,7 @@ Time to move on. Fortunately, port **8443** turned out to be much more interesti
 
 PWM is an open-source Java application designed to let users manage their Active Directory passwords without needing to call the help desk every Monday morning because they forgot it over the weekend. It supports password resets, account management, and LDAP integration, making it a pretty common choice in enterprise environments. Since it presented a login page, I tried checking for default credentials.
 
-A handful of common username/password combinations didn't work, so rather than brute-force a login page with zero evidence, I moved on.
+A handful of common username/password combinations didn't work, so rather than bruteforce a login page with zero evidence, I moved on.
 
 ### 📂 SMB Enumeration
 
@@ -235,7 +235,7 @@ SMB         10.129.229.56   445    AUTHORITY        [*] Windows 10 / Server 2019
 SMB         10.129.229.56   445    AUTHORITY        [+] authority.htb\bob: (Guest)
 ```
 
-The server reported that **Null Authentication** was enabled. Even more interesting, connecting with a completely made-up username and an empty password automatically authenticated me as the **Guest** account.
+The server reported that **Null Authentication** was enabled. Even more interesting, connecting with a completely made up username and an empty password automatically authenticated me as the **Guest** account.
 
 I next enumerated the available shares.
 
@@ -512,11 +512,11 @@ Since I wasn't familiar with how PWM works, I spend a few minutes reading throug
 
 The first thing I notice is the **Configuration Editor**.
 
-![PWM Configuration Manager landing page](/images/authority/configmanager.png)
+![PWM Configuration Manager landing page](/images/authority/configManager.png)
 
 After selecting **Configuration Editor**, PWM redirects me to an interface containing nearly every configuration option for the application.
 
-![PWM Configuration Editor interface](/images/authority/configeditor.png)
+![PWM Configuration Editor interface](/images/authority/configEditor.png)
 
 The interface is fairly well organized, with configuration categories listed in a navigation pane on the left. Since PWM authenticates users against LDAP, that's where I start looking. I found a way to generate an LDAP request by clicking on:
 
@@ -526,7 +526,7 @@ LDAP => LDAP Directories => default => Connection
 
 This page contains the LDAP connection settings used by PWM whenever it communicates with the domain controller. The `LDAP URLs` field catches my attention. Instead of being hardcoded, the LDAP server address is completely configurable. In the LDAP URLs field, I can add a URL. I next add a URL that points to my attacker machine.
 
-![Adding attacker-controlled URL to LDAP URLs field](/images/authority/ldapurls.png)
+![Adding attacker-controlled URL to LDAP URLs field](/images/authority/LDAPURLs.png)
 
 If I replace the legitimate LDAP server with one under my control, PWM will attempt to authenticate against my malicious server instead. It will do so using the service account configured for LDAP authentication. Sometimes the best exploits don't involve exploiting software at all they simply involve convincing software to do exactly what it was designed to do.
 
@@ -549,7 +549,7 @@ Responder to set up my malicious LDAP server.
 
 By default, Responder enables a number of rogue services, including an LDAP server capable of capturing authentication attempts. Once it's listening, I return to PWM and replace the LDAP URL with the IP address of my attacking machine.
 
-![Setting LDAP URL to attacker IP in PWM](/images/authority/attackerip.png)
+![Setting LDAP URL to attacker IP in PWM](/images/authority/attackerIP.png)
 
 PWM provides a **Test LDAP Profile** button that allows administrators to verify their LDAP configuration before saving it. Normally this sends a test request to the configured LDAP server. Unfortunately for the administrators the configured LDAP server is my attacker machine.
 
@@ -619,7 +619,7 @@ Once I have a shell as `svc_ldap`, I start looking for obvious privilege escalat
 
 At first glance, the account doesn't appear to have any interesting group memberships or special privileges. Rather than manually inspecting every Active Directory object, I collect data with **SharpHound** and load it into BloodHound.
 
-![BloodHound data loaded showing svc_ldap's object control](/images/authority/bhdata.png)
+![BloodHound data loaded showing svc_ldap's object control](/images/authority/BHdata.png)
 
 BloodHound maps relationships inside Active Directory and often reveals attack paths that would be difficult to spot manually. Looking at the **Outbound Object Control** for my compromised user, one object immediately catches my attention.
 
@@ -933,6 +933,6 @@ AUTHORITY$:des-cbc-md5:7532bffbb938200e
 [*] Cleaning up...
 ```
 
-With the Administrator NT hash in hand, the box is effectively compromised.
+With the Administrator NT hash in hand, the machine is effectively compromised.
 
-I actually like this machine because it demonstrates a valuable lesson: none of the individual misconfigurations are catastrophic on their own. Weak vault protection, exposed deployment files, a PWM configuration issue, the default `MachineAccountQuota`, and an ESC1-vulnerable certificate template each seem relatively minor in isolation. Combined, though, they form a complete attack path from a low-privileged service account to full domain compromise. That's exactly the kind of attack chain Active Directory assessments are designed to uncover.
+I actually like this machine because it demonstrates a valuable lesson: none of the individual misconfigurations are catastrophic on their own. Weak vault protection, exposed deployment files, a PWM configuration issue, the default `MachineAccountQuota`, and an ESC1 vulnerable certificate template each seem relatively minor in isolation. Combined, though, they form a complete attack path from a low privileged service account to full domain compromise. That's exactly the kind of attack chain Active Directory assessments are designed to uncover.
