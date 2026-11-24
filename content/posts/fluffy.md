@@ -16,7 +16,7 @@ status: Complete
 ## 📋 Initial Info
 - **Hostname:** `target.htb`
 
-Fluffy is an easy rated Windows machine that begins with credentials for a low-privileged user. By exploiting **CVE-2025-24071**, it's possible to recover another set of user credentials and continue expanding access within the domain. Enumeration uncovers several ACL misconfigurations tied to the `winrm_svc` and `ca_svc` service accounts, providing a clear privilege escalation path. After gaining `WinRM` access, the final step is abusing an `Active Directory Certificate Service ESC16` misconfiguration to escalate privileges and take control of the Administrator account.
+Fluffy is an easy rated Windows machine that begins with credentials for a low privileged user. By exploiting **CVE-2025-24071**, it's possible to recover another set of user credentials and continue expanding access within the domain. Enumeration uncovers several ACL misconfigurations tied to the `winrm_svc` and `ca_svc` service accounts, providing a clear privilege escalation path. After gaining `WinRM` access, the final step is abusing an `Active Directory Certificate Service ESC16` misconfiguration to escalate privileges and take control of the Administrator account.
 
 **Note from HackTheBox:**
 As is common in real life Windows pentests, you will start the Fluffy box with credentials for the following account: `j.fleischman / J0elTHEM4n1990!`
@@ -103,11 +103,13 @@ OS and Service detection performed. Please report any incorrect results at https
 Nmap done: 1 IP address (1 host up) scanned in 238.27 seconds
 ```
 
-This looks like a Domain Controller. First I'm going to update my `/etc/hosts` file. Since I know the username structure I could run a tool like `kerbrute` in the background to obtain more users. Before I dive too deep into that I'm going to start off by performing SMB enumeration.
+This appears to be a Domain Controller. First I'm going to update my `/etc/hosts` file and add `fluffy.htb` and `DC01.fluffy.htb`. 
+
+Since I know the username structure I could run a tool like `kerbrute` in the background to obtain more users. However before I dive too deep into that I'm going to start off by performing SMB enumeration.
 
 ### ♠ SMB Enumeration
 
-The credentials are valid and it appears we are dealing with a Windows 10 / Server 2019 Build 17763.
+The credentials are valid and it appears I'am dealing with a Windows 10 / Server 2019 Build 17763.
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB]
@@ -116,7 +118,7 @@ SMB         10.129.232.88   445    DC01             [*] Windows 10 / Server 2019
 SMB         10.129.232.88   445    DC01             [+] fluffy.htb\j.fleischman:J0elTHEM4n1990!
 ```
 
-Now let's see if there is any interesting shares.
+Now let's see if there are any interesting shares.
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB]
@@ -134,7 +136,7 @@ SMB         10.129.232.88   445    DC01             NETLOGON        READ        
 SMB         10.129.232.88   445    DC01             SYSVOL          READ            Logon server share
 ```
 
-The IT share sticks out as interesting. Now I'm going to use another tool `smbclient` to look for interesting files or clues.
+The IT share sticks out. Now I'm going to use another tool `smbclient` to look for interesting files or clues.
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB]
@@ -153,11 +155,11 @@ smb: \> ls
                 5842943 blocks of size 4096. 1819937 blocks available
 ```
 
-There are a few interesting things here. I'm going to download everything to my machine for further inspection.
+There are a few noteworthy findings here. I'm going to download everything to my local machine for further inspection.
 
 ![Upgrade Notice PDF contents](/images/fluffy/upgrade_notice.png)
 
-This PDF is very interesting. From what I'm gathering this was sent to Administrators in the IT department to address vulnerabilities found on the network. There are many paths I could take with the credentials I have but exploring these CVE's seem more interesting at the moment. I'm going to start off with the two listed as Critical.
+This PDF is very peculiar. From what I'm gathering this was sent to the Administrators in the IT department to address vulnerabilities found on the network. There are many paths I could take with the credentials I have but exploring these CVE's seem more interesting at the moment. I'm going to start off with the two listed as Critical.
 
 ---
 
@@ -335,9 +337,9 @@ RustHound-CE Enumeration Completed at 19:44:57 on 06/03/26! Happy Graphing!
 
 With all the `.json` files I'm going to fire up `BloodHound` and look at the data.
 
-![BloodHound graph data](/images/fluffy/bh-data.png)
+![BloodHound graph data](/images/fluffy/BH-Data.png)
 
-After some additional enumeration, I identified a path to the `winrm_svc` account, which confirmed my suspicion that it could be used for remote access since it belongs to the **Remote Management Users** group.
+After additional enumeration, I identified a path to the `winrm_svc` account, which confirmed my suspicion that it could be used for remote access since it belongs to the **Remote Management Users** group.
 
 The privilege escalation path here is fairly straightforward. I already have control over the `P.Agila` account, which is a member of the **Service Account Managers** group. This group has **GenericAll** rights over the **SERVICE ACCOUNTS** group, effectively giving it full control over that object.
 
@@ -381,7 +383,7 @@ Certipy v5.0.4 - by Oliver Lyak (ly4k)
 
 Certipy automatically generates a certificate, adds the malicious key credential to `winrm_svc`, authenticates as the account using PKINIT, retrieves a Kerberos TGT, and finally extracts the NT hash. Once the attack is complete, the original key credentials are restored to reduce evidence of the modification.
 
-The result is the NT hash for `winrm_svc`, giving me control of an account that can be used to access the target via WinRM.
+The result is the NT hash for `winrm_svc`, giving me control of an account that can access the target.
 
 The chain is:
 
@@ -442,7 +444,7 @@ ldap_svc                 p.agila                  winrm_svc
 The command completed with one or more errors.
 ```
 
-The name was a pretty strong hint that this account was related to Active Directory Certificate Services (AD CS), which often plays a role in certificate-based privilege escalation attacks.
+The name was a pretty strong hint that this account was related to Active Directory Certificate Services (AD CS), which often plays a role in certificate based privilege escalation attacks.
 
 A closer look at the account confirmed my suspicion.
 
@@ -479,7 +481,7 @@ The account description identifies it as the **Certificate Authority Service** a
 
 Earlier in the attack chain, I discovered that members of the **Service Accounts** group have write access over one another. This means that just as I abused `P.Agila` to take over `winrm_svc`, I can repeat the same process against `ca_svc`.
 
-![BloodHound path to ca_svc user](/images/fluffy/bh-casvc-user.png)
+![BloodHound path to ca_svc user](/images/fluffy/BH-casvcuser.png)
 
 Since I already have the NT hash for `winrm_svc`, I can authenticate with Certipy using pass-the-hash and perform another Shadow Credentials attack.
 
