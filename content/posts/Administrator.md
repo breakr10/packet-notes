@@ -20,7 +20,7 @@ difficulties: ["Medium"]
 
 ## Machine Overview
 
-Administrator is a medium-difficulty Active Directory machine that demonstrates how a series of misconfigured permissions can lead to a complete domain compromise. Starting with credentials for a low-privileged user, the attack path revolves around enumerating access control lists (ACLs) and identifying opportunities to abuse delegated permissions between user accounts.
+Administrator is a medium difficulty Active Directory machine that demonstrates how a series of misconfigured permissions can lead to a complete domain compromise. Starting with credentials for a low privileged user, the attack path revolves around enumerating access control lists (ACLs) and identifying opportunities to abuse delegated permissions between user accounts.
 
 The first breakthrough comes from discovering that one user has full control over another account, allowing a password reset and access to additional resources within the domain. As enumeration continues, each compromised account reveals new privileges and relationships that can be leveraged to gain access to the next user in the chain.
 
@@ -344,7 +344,7 @@ Anyone with DCSync privileges can impersonate a Domain Controller and request pa
 
 The only challenge is getting control of Ethan's account.
 
-![BloodHound: Emily GenericWrite over Ethan with DCSync rights](/images/administrator/emily-to-ethan-bh.png)
+![BloodHound: Emily GenericWrite over Ethan with DCSync rights](/images/administrator/EtoE.png)
 
 #### Verifying the Permissions
 
