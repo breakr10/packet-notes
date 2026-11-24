@@ -17,7 +17,7 @@ status: Complete
 
 Baby is an easy Windows machine focused on Active Directory fundamentals. The attack path involves LDAP enumeration to identify misconfigured directory data, leading to the discovery of exposed credentials.
 
-After gaining initial access, the compromised user possesses the **`SeBackupPrivilege`**, which can be leveraged to dump the Domain Controller's registry hives and escalate privileges to full Domain Admin.
+After gaining initial access, the compromised user possesses the **`SeBackupPrivilege`**, which is leveraged to dump the Domain Controller's registry hives and escalate privileges to full Domain Admin.
 
 ---
 
@@ -100,11 +100,11 @@ Based on the output this appears to be a Domain Controller. I'll add `baby.vl` a
 
 I enumerated `SMB` without any luck since anonymous access is not allowed.
 
-I next looked at `LDAP` to see if I can enumerate directories without credentials.
+I next looked at `LDAP` to see if I can enumerate directories without needing credentials.
 
 Success!
 
-It's a lot of information so I passed it into a text file to search through.
+It's a lot of information so I passed it into a text file to simplify searching.
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Baby]
@@ -114,9 +114,9 @@ It's a lot of information so I passed it into a text file to search through.
 ldapdata  nmap
 ```
 
-With this data and i will search for users, accounts, groups, and passwords using `grep`.
+With this data I will search for users, accounts, groups, and passwords using the Linux command `grep`.
 
-I always start out by looking at the `description:` field as this sometimes has compromising information like passwords.
+I like to look at the `description:` field as this sometimes has compromising information like passwords.
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Baby]
@@ -239,7 +239,7 @@ After unsuccessfully testing the credentials elsewhere, I revisited the `Carolin
 
 ## ⚡ Exploitation (Initial Access)
 
-There are multiple ways to do this tools like `rpcclient` or `netexec` both support it. I opted for `smbpasswd`, which allowed me to successfully reset the password and gain access.
+There are multiple ways to do this with tools like `rpcclient` or `netexec` both supporting it. I opted for `smbpasswd`, which allowed me to successfully reset the password and gain access.
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Baby]
@@ -250,7 +250,7 @@ Retype new SMB password:
 Password changed for user Caroline.Robinson
 ```
 
-Password was changed to `Password123`
+The password was changed to `Password123`
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Baby]
@@ -290,7 +290,7 @@ image
 
 ### Local Enumeration 
 
-Once I get a shell one of my first enumeration steps is to check my user's privileges.
+Once I have a shell one of my first enumeration steps is to check my user's privileges.
 
 Right away without having to dig too much I see a dangerous privilege `SeBackupPrivilege`.
 
@@ -316,7 +316,7 @@ From an attacker's perspective, that's extremely useful. It can be abused to cop
 
 So I can do this a few ways.
 
-#### Method 1
+### Method 1
 1. Backup the **SAM** and **SYSTEM** hives
 2. Create a script file for `diskshadow`
 3. Execute `diskshadow` to create a shadow copy
@@ -365,7 +365,7 @@ expose %mydrive% p:
 end backup
 ```
 
-Executed diskshadow
+Executing diskshadow
 
 ```shell
 *Evil-WinRM* PS C:\users\public> dir
@@ -404,7 +404,7 @@ SET CONTEXT { CLIENTACCESSIBLE | PERSISTENT [ NOWRITERS ] | VOLATILE [ NOWRITERS
         Example: SET CONTEXT CLIENTACCESSIBLE
 ```
 
-At this point, `diskshadow` throws an error notice it truncates `nowriters` to `nowriter`, which breaks execution. I suspected this might be an issue with the Evil-WinRM shell, so I re-tried using a Meterpreter session, but ran into similar problems.
+At this point, `diskshadow` throws an error notice it truncates `nowriters` to `nowriter`, which breaks execution. I suspected this might be an issue with the Evil-WinRM shell (which it 100% is I later found out), so I re-tried using a Meterpreter session, but ran into similar problems.
 
 Even though I successfully dumped the **SAM** and **SYSTEM** hives (enough for local hash extraction), I didn't have sufficient privileges to complete this method and access more sensitive files.
 
@@ -423,7 +423,7 @@ In short, you don't need the SECURITY hive to make `secretsdump` work but skippi
 
 I failed to grab the `NTDS` hive with robocopy so I resorted to this second method.
 
-#### Method 2
+### Method 2
 
 `https://github.com/improsec/BackupOperatorToolkit`
 
@@ -473,7 +473,7 @@ So while both methods aim to achieve similar goals accessing protected system da
 
 One thing to keep in mind is that while this method is reliable, it's not particularly stealthy. Accessing files like `SAM` or `ntds.dit` can generate logs and may be flagged in real environments. In a lab or CTF, that's not a concern but in a real engagement, it's something to be aware of.
 
-The main takeaway here is simple: having the right privilege isn't always enough—you also need to use the right technique that matches it.
+The main takeaway here is simple: having the right privilege isn't always enough you also need to use the right technique that matches it.
 
 Next part is straightforward. I used `impacket's secretsdump` to extract local hashes.
 
