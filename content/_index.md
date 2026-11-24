@@ -1,6 +1,9 @@
 ---
-title: Exploit knowledge, not just binaries
+title: The Art of Enumeration
 description: Somewhere between printf("Hello, world!") and sudo rm -rf /
 ---
 
-Somewhere between `printf("Hello, world!")` and `sudo rm -rf /`, there's a journey—one filled with CTF writeups, security insights, and programming mishaps. Stick around, I’ll break things (ethically) so you don’t have to.
+`ls -la`
+"You will not see what you do not look for." -Cort, The DarkTower
+
+Machine writeups and security notes, including the reasoning and the dead ends.
