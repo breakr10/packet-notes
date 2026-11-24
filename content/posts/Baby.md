@@ -284,7 +284,7 @@ Pwn3d!
 
 I am able to use a tool like `Evil-WinRM` to login.
 
-image
+![Successful Login](/images/baby/crshell.png)
 
 ## 🛡️ Privilege Escalation
 
@@ -547,6 +547,8 @@ SMB         10.129.32.56    445    BABYDC           [+] Dumped 14 NTDS hashes to
 SMB         10.129.32.56    445    BABYDC           [*] To extract only enabled accounts from the output file, run the following command:
 SMB         10.129.32.56    445    BABYDC           [*] grep -iv disabled /home/split/.nxc/logs/ntds/BABYDC_10.129.32.56_2026-05-05_123646.ntds | cut -d ':' -f1
 ```
+
+![Successful Login](/images/baby/root.png)
 
 ## 📓 Lessons Learned
 
