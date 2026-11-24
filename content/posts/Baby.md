@@ -473,9 +473,9 @@ So while both methods aim to achieve similar goals accessing protected system da
 
 One thing to keep in mind is that while this method is reliable, it's not particularly stealthy. Accessing files like `SAM` or `ntds.dit` can generate logs and may be flagged in real environments. In a lab or CTF, that's not a concern but in a real engagement, it's something to be aware of.
 
-The main takeaway here is simple: having the right privilege isn't always enough you also need to use the right technique that matches it.
+The main takeaway here is simple: having the right privilege isn't always enough, you also need to use the right technique that matches it.
 
-Next part is straightforward. I used `impacket's secretsdump` to extract local hashes.
+The next part is straightforward. I used `impacket's secretsdump` to extract local hashes.
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Baby]
@@ -508,7 +508,7 @@ NL$KM:b696c77e178a0cdd8c39c20aa2912444a2e44dc2095946c07f95ea11cb7fcb72ec2e5a0601
 [*] Cleaning up...
 ```
 
-I next used the machine account to perform a DCSync attack.
+I then used the machine account to perform a DCSync attack.
 
 To run DCSync, you need:
 
@@ -548,13 +548,15 @@ SMB         10.129.32.56    445    BABYDC           [*] To extract only enabled 
 SMB         10.129.32.56    445    BABYDC           [*] grep -iv disabled /home/split/.nxc/logs/ntds/BABYDC_10.129.32.56_2026-05-05_123646.ntds | cut -d ':' -f1
 ```
 
+I am now the Administrator account.
+
 ![Successful Login](/images/baby/root.png)
 
 ## 📓 Lessons Learned
 
 I had two different approaches for pulling sensitive data from the Domain Controller, and it raised an important question. Could I have retrieved everything I needed from the first method?
 
-The short answer is yes, at least partially. Using `reg save`, I was already able to dump the **SAM** and **SYSTEM** hives thanks to `SeBackupPrivilege`. If my `diskshadow` attempt had worked, I could have just as easily copied the **SECURITY** hive from the shadow copy as well. The issue wasn't capability—it was that Volume Shadow Copy (VSS) wasn't cooperating in my shell, which blocked that path entirely.
+The short answer is yes, at least partially. Using `reg save`, I was already able to dump the **SAM** and **SYSTEM** hives thanks to `SeBackupPrivilege`. If my `diskshadow` attempt had worked, I could have just as easily copied the **SECURITY** hive from the shadow copy as well. The issue wasn't capability—it was that Volume Shadow Copy (VSS) wasn't cooperating in my shell, which blocked that path entirely. This has to do with Evil-WinRM and there is a simple fix which I later discovered from my notes. My bad.
 
 Originally, the goal of that method wasn't just to grab registry hives it was to go after the real prize: the `ntds.dit` file. This file contains the full Active Directory database, including all domain user hashes. The plan was to create a shadow copy and then use something like `robocopy` to pull `ntds.dit` offline for parsing. Since the VSS step failed, that approach never fully materialized.
 
