@@ -472,20 +472,20 @@ So the `TRUSTED_FOR_DELEGATION` Key Attribute tells me it's going to be an Uncon
 
 ### Unconstrained Delegation
 
-TL;DR — Attack Path Overview
+**TL;DR Attack Path Overview**
 
-The Delegate box hinges on a classic but devastating Active Directory misconfiguration: a low-privileged user is granted the extended right SeEnableDelegationPrivilege normally reserved for domain administrators through membership in a custom "Delegation Admin" group. This single oversight opens the door to full domain compromise via an Unconstrained Delegation attack.
+The Delegate box hinges on a classic but devastating Active Directory misconfiguration: a low privileged user is granted the extended right `SeEnableDelegationPrivilege` normally reserved for domain administrators through membership in a custom "Delegation Admin" group. This single oversight opens the door to full domain compromise via an Unconstrained Delegation attack.
 
-The high-level chain looks like this:
+The high level chain looks like this:
 
-1. Enumerate → discover N.Thompson holds SeEnableDelegationPrivilege and that the Domain Controller is configured with TRUSTED_FOR_DELEGATION.
-2. Abuse the Machine Account Quota → create a rogue computer account (evil$) that the attacker fully controls.
-3. Weaponize the privilege → flag the rogue computer as trusted for unconstrained delegation something a normal user should never be able to do.
-4. Fake legitimacy → register a DNS record and SPN so evil$ looks like a real, reachable service on the domain.
-5. Coerce authentication → use the Print Spooler bug (printerbug.py) to force the Domain Controller to authenticate to the attacker's fake machine.
-6. Capture the TGT → because the fake machine is trusted for delegation, the DC's full Kerberos TGT is handed over and captured with krbrelayx.
-7. Dump domain secrets → use the stolen DC machine account TGT to perform a DCSync and extract the Administrator's NTLM hash.
-8. Game over → authenticate as delegate\administrator via Evil-WinRM.
+1. **Enumerate** → discover N.Thompson holds the `SeEnableDelegationPrivilege` and that the Domain Controller is configured with **TRUSTED_FOR_DELEGATION**.
+2. **Abuse the Machine Account Quota** → create a rogue computer account `evil$` that the attacker fully controls.
+3. **Weaponize the privilege** → flag the rogue computer as trusted for unconstrained delegation something a normal user should never be able to do.
+4. **Fake legitimacy** → register a DNS record and SPN so `evil$` looks like a real, reachable service on the domain.
+5. **Coerce authentication** → use the Print Spooler bug printerbug.py to force the Domain Controller to authenticate to the attacker's fake machine.
+6. **Capture the TGT** → because the fake machine is trusted for delegation, the DC's full Kerberos TGT is handed over and captured with krbrelayx.
+7. **Dump domain secrets** → use the stolen DC machine account TGT to perform a DCSync and extract the Administrator's NTLM hash.
+8. **Game over** → authenticate as delegate\administrator via Evil-WinRM.
 
 **Root cause in one sentence:** a user was given the power to configure delegation, the domain allowed arbitrary new computer accounts, and nothing coerced the DC into revealing its TGT to a bad actor until this chain was pulled together.
 
@@ -558,16 +558,6 @@ Crafting an SPN on the Target Computer
 ```shell
 ┌─[split@parrot:~/Tools/krbrelayx]
 └─❯ python3 addspn.py -u 'delegate.vl\N.Thompson' -p KALEB_2341 -s 'cifs/evil.delegate.vl' -t evil$ -dc-ip 10.129.234.69 DC1.delegate.vl --additional                     1 ↵ ──(Tue,May26)─┘
-[-] Connecting to host...
-[-] Binding to host
-[+] Bind OK
-[+] Found modification target
-[+] SPN Modified successfully
-```
-
-```shell
-┌─[split@parrot:~/Tools/krbrelayx]
-└─❯ python3 addspn.py -u 'delegate.vl\N.Thompson' -p KALEB_2341 -s 'cifs/evil.delegate.vl' -t evil$ -dc-ip 10.129.234.69 DC1.delegate.vl
 [-] Connecting to host...
 [-] Binding to host
 [+] Bind OK
